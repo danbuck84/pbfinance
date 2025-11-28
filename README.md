@@ -1,8 +1,8 @@
-# PB Finance V3 💰
+# PB Finance 💰
 
-Bem-vindo ao **PB Finance V3**, o sistema definitivo de gestão financeira familiar. Este projeto foi desenvolvido para oferecer controle total sobre receitas, despesas, cartões de crédito e planejamento financeiro, tudo em uma interface moderna, responsiva e intuitiva.
+Bem-vindo ao **PB Finance**, o sistema definitivo de gestão financeira familiar. Este projeto foi desenvolvido para oferecer controle total sobre receitas, despesas, cartões de crédito e planejamento financeiro, tudo em uma interface moderna, responsiva e intuitiva.
 
-![PB Finance Preview](public/placeholder.svg)
+![PB Finance Preview](public/pbfinance-app-screen.jpg)
 *(Substitua esta imagem por um screenshot real do seu dashboard)*
 
 ## 🚀 Sobre o Projeto

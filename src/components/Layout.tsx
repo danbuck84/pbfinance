@@ -22,7 +22,7 @@ export const Layout = ({ children }: LayoutProps) => {
                 <SidebarTrigger className="md:hidden">
                   <Menu className="h-5 w-5" />
                 </SidebarTrigger>
-                <h1 className="text-lg font-bold text-primary">PB Finance V3</h1>
+                <h1 className="text-lg font-bold text-primary">PB Finance</h1>
               </div>
               <ThemeToggle />
             </div>
