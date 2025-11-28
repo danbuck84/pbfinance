@@ -1,73 +1,69 @@
-# Welcome to your Lovable project
+# PB Finance V3 💰
 
-## Project info
+Bem-vindo ao **PB Finance V3**, o sistema definitivo de gestão financeira familiar. Este projeto foi desenvolvido para oferecer controle total sobre receitas, despesas, cartões de crédito e planejamento financeiro, tudo em uma interface moderna, responsiva e intuitiva.
 
-**URL**: https://lovable.dev/projects/9c9bb30e-fc5b-434f-a633-b7a72afa1e15
+![PB Finance Preview](public/placeholder.svg)
+*(Substitua esta imagem por um screenshot real do seu dashboard)*
 
-## How can I edit this code?
+## 🚀 Sobre o Projeto
 
-There are several ways of editing your application.
+O **PB Finance** nasceu da necessidade de centralizar e simplificar a gestão financeira da família. Diferente de planilhas complexas ou apps genéricos, este sistema é focado em:
 
-**Use Lovable**
+*   **Multi-tenancy Familiar**: Gestão de contas e cartões compartilhados entre membros da família.
+*   **Controle de Cartões**: Acompanhamento detalhado de faturas, limites e datas de fechamento.
+*   **Categorização Inteligente**: Separação clara entre despesas fixas, variáveis, lazer e investimentos.
+*   **Visualização de Dados**: Gráficos claros para entender para onde o dinheiro está indo.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/9c9bb30e-fc5b-434f-a633-b7a72afa1e15) and start prompting.
+## 🛠️ Tecnologias Utilizadas
 
-Changes made via Lovable will be committed automatically to this repo.
+Este projeto utiliza as tecnologias mais modernas do ecossistema React:
 
-**Use your preferred IDE**
+*   **[Vite](https://vitejs.dev/)**: Build tool ultra-rápida.
+*   **[React](https://react.dev/)**: Biblioteca para construção de interfaces.
+*   **[TypeScript](https://www.typescriptlang.org/)**: Segurança de tipos e melhor experiência de desenvolvimento.
+*   **[Tailwind CSS](https://tailwindcss.com/)**: Estilização utilitária para design rápido e responsivo.
+*   **[Shadcn/ui](https://ui.shadcn.com/)**: Componentes de UI reutilizáveis e acessíveis.
+*   **[Firebase](https://firebase.google.com/)**: Backend as a Service (Auth, Firestore).
+*   **[Recharts](https://recharts.org/)**: Biblioteca de gráficos para React.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## ⚙️ Como Rodar Localmente
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1.  **Clone o repositório**
+    ```bash
+    git clone https://github.com/danbuck84/pbfinance.git
+    cd pbfinance
+    ```
 
-Follow these steps:
+2.  **Instale as dependências**
+    ```bash
+    npm install
+    ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+3.  **Configure as Variáveis de Ambiente**
+    Crie um arquivo `.env` na raiz do projeto (use o `.env.example` como base) e adicione suas credenciais do Firebase:
+    ```env
+    VITE_FIREBASE_API_KEY=sua_chave
+    VITE_FIREBASE_AUTH_DOMAIN=seu_dominio
+    ...
+    ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+4.  **Inicie o servidor de desenvolvimento**
+    ```bash
+    npm run dev
+    ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+## 📦 Deploy
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+O deploy é realizado automaticamente via **Netlify** a cada push na branch `main`.
 
-**Edit a file directly in GitHub**
+Para configurar o deploy manualmente ou em outro ambiente:
+1.  Build do projeto: `npm run build`
+2.  A pasta `dist` conterá os arquivos estáticos prontos para produção.
+3.  Certifique-se de configurar as variáveis de ambiente no painel do seu provedor de hospedagem.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 📝 Licença
 
-**Use GitHub Codespaces**
+Este projeto é de uso privado e pessoal.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/9c9bb30e-fc5b-434f-a633-b7a72afa1e15) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+---
+Desenvolvido com 💙 por Dan Buck.
