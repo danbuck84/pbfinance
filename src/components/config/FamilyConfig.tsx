@@ -6,12 +6,31 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserProfile, Household } from '@/types'; // Assuming Household type is available
-import { Loader2, Copy, LogIn, Crown, User as UserIcon, AlertTriangle } from 'lucide-react';
+import { Loader2, Copy, LogIn, Crown, User as UserIcon, AlertTriangle, Shield, UserCog, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useFirestore } from '@/hooks/useFirestore';
 
 export function FamilyConfig() {
     const { currentHousehold, currentUser, joinHouseholdByCode, createHousehold, switchHousehold } = useAuth();
+    const { updateMemberRole, removeMember } = useFirestore(); // Hook completo
     const [members, setMembers] = useState<UserProfile[]>([]);
     const [myHouseholds, setMyHouseholds] = useState<Household[]>([]);
     const [joinCode, setJoinCode] = useState('');
@@ -202,6 +221,11 @@ export function FamilyConfig() {
                     ) : (
                         members.map(member => {
                             const role = currentHousehold?.roles?.[member.uid] || 'MEMBER';
+                            const isMe = member.uid === currentUser?.uid;
+
+                            // Apenas Admin vê controles (e não pode se remover/alterar)
+                            const showControls = isOwner && !isMe;
+
                             return (
                                 <div key={member.uid} className="flex items-center justify-between p-3 border rounded-lg bg-card">
                                     <div className="flex items-center gap-3">
@@ -210,19 +234,77 @@ export function FamilyConfig() {
                                             <AvatarFallback>{member.displayName?.substring(0, 2).toUpperCase()}</AvatarFallback>
                                         </Avatar>
                                         <div>
-                                            <p className="font-medium">{member.displayName}</p>
+                                            <p className="font-medium flex items-center gap-2">
+                                                {member.displayName}
+                                                {isMe && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">Você</span>}
+                                            </p>
                                             <p className="text-xs text-muted-foreground">{member.email}</p>
                                         </div>
                                     </div>
+
                                     <div className="flex items-center gap-2">
-                                        {role === 'OWNER' ? (
-                                            <span className="text-xs bg-amber-500/10 text-amber-600 px-2 py-1 rounded-full flex items-center gap-1 font-medium border border-amber-500/20">
-                                                <Crown className="w-3 h-3" /> Admin
-                                            </span>
+                                        {/* GESTÃO DE PAPÉIS */}
+                                        {showControls ? (
+                                            <Select
+                                                defaultValue={role}
+                                                onValueChange={(val) => {
+                                                    updateMemberRole(member.uid, val as 'OWNER' | 'MEMBER');
+                                                    toast.success("Função atualizada!");
+                                                }}
+                                            >
+                                                <SelectTrigger className="w-[130px] h-8">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="MEMBER">Membro</SelectItem>
+                                                    <SelectItem value="OWNER">Admin</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         ) : (
-                                            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full flex items-center gap-1 dark:bg-slate-800 dark:text-slate-400">
-                                                <UserIcon className="w-3 h-3" /> Membro
-                                            </span>
+                                            /* VIEW ONLY */
+                                            role === 'OWNER' ? (
+                                                <span className="text-xs bg-amber-500/10 text-amber-600 px-2 py-1 rounded-full flex items-center gap-1 font-medium border border-amber-500/20">
+                                                    <Shield className="w-3 h-3" /> Admin
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full flex items-center gap-1 dark:bg-slate-800 dark:text-slate-400">
+                                                    <UserIcon className="w-3 h-3" /> Membro
+                                                </span>
+                                            )
+                                        )}
+
+                                        {/* BOTÃO REMOVER (LIXEIRA) */}
+                                        {showControls && (
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Remover membro?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            Tem certeza que deseja remover {member.displayName} desta família?
+                                                            Ele perderá o acesso imediatamente.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                        <AlertDialogAction
+                                                            onClick={async () => {
+                                                                await removeMember(member.uid);
+                                                                toast.success("Membro removido.");
+                                                                // Atualiza lista localmente (opcional, pois o useEffect recarregaria, mas ajuda na UX)
+                                                                setMembers(prev => prev.filter(m => m.uid !== member.uid));
+                                                            }}
+                                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                        >
+                                                            Remover
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
                                         )}
                                     </div>
                                 </div>

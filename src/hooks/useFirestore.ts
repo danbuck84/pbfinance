@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch, Timestamp, getDocs, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch, Timestamp, getDocs, getDoc, arrayRemove, deleteField } from 'firebase/firestore';
 import { db, type Transacao, type Config } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -129,6 +129,34 @@ export const useFirestore = () => {
     await setDoc(doc(db, 'households', currentHousehold.id, 'config', 'geral'), defaultConfig);
   };
 
+  const updateMemberRole = async (memberId: string, newRole: 'OWNER' | 'MEMBER') => {
+    if (!currentHousehold) return;
+    await updateDoc(doc(db, 'households', currentHousehold.id), {
+      [`roles.${memberId}`]: newRole
+    });
+  };
+
+  const removeMember = async (memberId: string) => {
+    if (!currentHousehold) return;
+
+    const batch = writeBatch(db);
+
+    // 1. Remove from Household (members array and roles map)
+    const householdRef = doc(db, 'households', currentHousehold.id);
+    batch.update(householdRef, {
+      members: arrayRemove(memberId),
+      [`roles.${memberId}`]: deleteField()
+    });
+
+    // 2. Remove household from User
+    const userRef = doc(db, 'users', memberId);
+    batch.update(userRef, {
+      currentHouseholdId: null
+    });
+
+    await batch.commit();
+  };
+
   const resetHousehold = async () => {
     if (!currentHousehold) return;
 
@@ -157,6 +185,8 @@ export const useFirestore = () => {
     deleteTransacao,
     updateConfig,
     addTransacaoParcelada,
-    resetHousehold
+    resetHousehold,
+    updateMemberRole,
+    removeMember
   };
 };
