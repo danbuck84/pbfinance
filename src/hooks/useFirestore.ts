@@ -6,13 +6,13 @@ import { useAuth } from '@/contexts/AuthContext';
 export const useFirestore = () => {
   const { currentUser, currentHousehold } = useAuth();
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
-  const [config, setConfig] = useState<Config>({ contas: [], beneficios: [], cartoes: [], contasFixas: [] });
+  const [config, setConfig] = useState<Config>({ contas: [], beneficios: [], cartoes: [], contasFixas: [], categorias: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!currentUser || !currentHousehold) {
       setTransacoes([]);
-      setConfig({ contas: [], beneficios: [], cartoes: [], contasFixas: [] });
+      setConfig({ contas: [], beneficios: [], cartoes: [], contasFixas: [], categorias: [] });
       setLoading(false);
       return;
     }
@@ -35,7 +35,7 @@ export const useFirestore = () => {
         setConfig(snapshot.data() as Config);
       } else {
         // Fallback or init empty
-        setConfig({ contas: [], beneficios: [], cartoes: [], contasFixas: [] });
+        setConfig({ contas: [], beneficios: [], cartoes: [], contasFixas: [], categorias: [] });
       }
       setLoading(false);
     });
