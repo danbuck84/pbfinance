@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch, Timestamp, getDocs, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch, Timestamp, getDocs, getDoc } from 'firebase/firestore';
 import { db, type Transacao, type Config } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -13,7 +13,10 @@ useEffect(() => {
     return;
   }
 
-  const qTransacoes = query(collection(db, 'households', currentHousehold.id, 'transacoes'));
+  const qTransacoes = query(
+    collection(db, 'households', currentHousehold.id, 'transacoes'),
+    where('householdId', '==', currentHousehold.id) // RED CODE FIX: Explicit Isolation
+  );
   const unsubTransacoes = onSnapshot(qTransacoes, (snapshot) => {
     const docs = snapshot.docs.map(doc => ({
       id: doc.id,
@@ -43,6 +46,7 @@ const addTransacao = async (transacao: Omit<Transacao, 'id' | 'createdAt'>) => {
   if (!currentHousehold) return;
   await addDoc(collection(db, 'households', currentHousehold.id, 'transacoes'), {
     ...transacao,
+    householdId: currentHousehold.id, // RED CODE FIX
     createdAt: Timestamp.now()
   });
 };
@@ -79,6 +83,7 @@ const addTransacaoParcelada = async (transacao: Omit<Transacao, 'id' | 'createdA
       data: dataParcela.toISOString().split('T')[0],
       parcela: `${i + 1}/${numParcelas}`,
       descricao: `${transacao.descricao} (${i + 1}/${numParcelas})`,
+      householdId: currentHousehold.id, // RED CODE FIX
       createdAt: Timestamp.now()
     });
   }

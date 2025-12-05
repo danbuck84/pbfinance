@@ -157,11 +157,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const logout = async () => {
         try {
             await signOut(auth);
+            localStorage.clear(); // Limpa tudo
         } catch (error) {
             console.error(error);
         } finally {
-            setLoading(false);
-            window.location.reload();
+            window.location.href = "/"; // Força o navegador a recarregar do zero absoluto
         }
     };
 

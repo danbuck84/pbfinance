@@ -255,21 +255,31 @@ export function FamilyConfig() {
                 </form>
             </div>
 
-            {/* SEÇÃO 4: ZONA DE PERIGO */}
-            {isOwner && (
-                <div className="pt-8 border-t mt-8">
-                    <h2 className="text-lg font-semibold text-destructive mb-2">Zona de Perigo</h2>
-                    <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 space-y-4 flex items-center justify-between">
+            {/* SEÇÃO 4: ZONA DE PERIGO (Sempre visível para debug) */}
+            <div className="pt-8 border-t mt-8">
+                <h2 className="text-lg font-semibold text-destructive mb-2">Zona de Perigo {isOwner ? '(Admin)' : '(Membro)'}</h2>
+                <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 space-y-4">
+
+                    {/* Edição de Nome (Novo) */}
+                    <div className="flex items-center gap-2">
+                        <Input
+                            placeholder="Editar Nome da Família"
+                            defaultValue={currentHousehold?.name}
+                        />
+                        <Button variant="outline" size="sm">Renomear</Button>
+                    </div>
+
+                    <div className="flex items-center justify-between">
                         <div>
                             <h3 className="font-medium text-destructive">Zerar Dados da Família</h3>
                             <p className="text-sm text-muted-foreground">
-                                Apaga todas as transações e contas, mantendo os membros. Ação irreversível.
+                                Apaga todas as transações e contas. (Botão desbloqueado para DEBUG)
                             </p>
                         </div>
                         <ResetAction />
                     </div>
                 </div>
-            )}
+            </div>
         </div>
     );
 }
