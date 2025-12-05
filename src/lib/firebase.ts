@@ -101,11 +101,19 @@ export interface CategoriasCustomizadas {
   saida: Record<string, string[]>;
 }
 
+export interface Categoria {
+  id: string;
+  nome: string;
+  cor: string;
+  tipo: 'despesa' | 'receita';
+}
+
 export interface Config {
   contas: Conta[];
   beneficios: Beneficio[];
   cartoes: Cartao[];
   contasFixas: ContaFixa[];
+  categorias: Categoria[];
   categoriasCustomizadas?: CategoriasCustomizadas;
 }
 
