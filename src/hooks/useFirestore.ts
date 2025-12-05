@@ -5,6 +5,9 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export const useFirestore = () => {
   const { currentUser, currentHousehold } = useAuth();
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [config, setConfig] = useState<Config>({ contas: [], beneficios: [], cartoes: [], contasFixas: [] });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!currentUser || !currentHousehold) {
