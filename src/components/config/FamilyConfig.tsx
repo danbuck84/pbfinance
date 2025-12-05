@@ -30,7 +30,7 @@ import { useFirestore } from '@/hooks/useFirestore';
 
 export function FamilyConfig() {
     const { currentHousehold, currentUser, joinHouseholdByCode, createHousehold, switchHousehold } = useAuth();
-    const { updateMemberRole, removeMember, updateHousehold } = useFirestore(); // Hook completo
+    const { updateMemberRole, removeMember, updateHousehold, migrateLegacyData } = useFirestore(); // Hook completo
     const [members, setMembers] = useState<UserProfile[]>([]);
     const [myHouseholds, setMyHouseholds] = useState<Household[]>([]);
     const [joinCode, setJoinCode] = useState('');
@@ -349,6 +349,11 @@ export function FamilyConfig() {
                 </form>
             </div>
 
+            {/* SEÇÃO 5: MIGRAÇÃO DE DADOS (Admin Only) */}
+            {isOwner && (
+                <MigrationTool households={myHouseholds} currentId={currentHousehold?.id} />
+            )}
+
             {/* SEÇÃO 4: ZONA DE PERIGO (Sempre visível para debug) */}
             <div className="pt-8 border-t mt-8">
                 <h2 className="text-lg font-semibold text-destructive mb-2">Zona de Perigo {isOwner ? '(Admin)' : '(Membro)'}</h2>
@@ -407,5 +412,74 @@ function ResetAction() {
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Resetar Dados
         </Button>
+    );
+}
+
+function MigrationTool({ households, currentId }: { households: Household[], currentId?: string }) {
+    const { migrateLegacyData } = useFirestore();
+    const [targetId, setTargetId] = useState(currentId || '');
+    const [loading, setLoading] = useState(false);
+
+    // Sync targetId with currentId initially or if it changes
+    useEffect(() => {
+        if (currentId) setTargetId(currentId);
+    }, [currentId]);
+
+    const handleImport = async () => {
+        if (!targetId) {
+            toast.error("Selecione uma família de destino.");
+            return;
+        }
+
+        const confirm = window.confirm(`Deseja importar os dados de 'familias/pbfamily' para a família selecionada? \n\nIsso pode demorar alguns segundos.`);
+        if (!confirm) return;
+
+        setLoading(true);
+        try {
+            const result = await migrateLegacyData?.(targetId);
+            toast.success(`Importação concluída! ${result?.count} transações importadas.`);
+            if (targetId === currentId) window.location.reload();
+        } catch (error) {
+            console.error(error);
+            toast.error("Erro na importação. Verifique o console.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="pt-8 border-t mt-8">
+            <h2 className="text-lg font-semibold text-blue-600 mb-2 flex items-center gap-2">
+                <Copy className="w-5 h-5" /> Ferramenta de Migração (Legado)
+            </h2>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4 dark:bg-blue-900/10 dark:border-blue-800">
+                <p className="text-sm text-muted-foreground">
+                    Importa dados da estrutura antiga (`pbfamily`) para uma nova estrutura.
+                </p>
+
+                <div className="flex flex-col md:flex-row gap-4 items-end">
+                    <div className="w-full md:w-1/2 space-y-2">
+                        <label className="text-sm font-medium">Destino</label>
+                        <Select value={targetId} onValueChange={setTargetId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione a família" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {households.map(h => (
+                                    <SelectItem key={h.id} value={h.id}>
+                                        {h.name} {h.id === currentId ? '(Atual)' : ''}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <Button onClick={handleImport} disabled={loading} className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white">
+                        {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                        Importar do Legado
+                    </Button>
+                </div>
+            </div>
+        </div>
     );
 }

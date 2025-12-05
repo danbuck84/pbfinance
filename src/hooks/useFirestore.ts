@@ -181,6 +181,87 @@ export const useFirestore = () => {
     await updateDoc(doc(db, 'households', currentHousehold.id), data);
   };
 
+  const migrateLegacyData = async (targetHouseholdId: string) => {
+    if (!currentUser) return;
+
+    try {
+      // 1. Fetch Legacy Transactions
+      const legacyTransacoesSnap = await getDocs(collection(db, 'familias', 'pbfamily', 'transacoes'));
+      const legacyTransacoes = legacyTransacoesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      console.log(`Found ${legacyTransacoes.length} legacy transactions.`);
+
+      // 2. Fetch Legacy Config
+      const legacyConfigSnap = await getDoc(doc(db, 'familias', 'pbfamily', 'config', 'geral'));
+      const legacyConfig = legacyConfigSnap.exists() ? legacyConfigSnap.data() as Config : null;
+
+      // 3. Batch Write Transactions (Chunked by 500)
+      // Helper for chunking
+      const chunkArray = (arr: any[], size: number) => {
+        return Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
+          arr.slice(i * size, i * size + size)
+        );
+      };
+
+      const chunks = chunkArray(legacyTransacoes, 450); // Safe limit under 500
+      let successCount = 0;
+
+      for (const chunk of chunks) {
+        const batch = writeBatch(db);
+        chunk.forEach((t: any) => {
+          // Use original ID or auto-gen? Using original ID is safer for idempotency if repeated.
+          const ref = doc(db, 'households', targetHouseholdId, 'transacoes', t.id);
+          batch.set(ref, {
+            ...t,
+            householdId: targetHouseholdId,
+            legacy_import: true,
+            importedAt: Timestamp.now()
+          }, { merge: true }); // Merge prevents overwriting newer fields if re-run
+        });
+        await batch.commit();
+        successCount += chunk.length;
+      }
+
+      // 4. Update Config (Merge)
+      if (legacyConfig) {
+        const targetConfigRef = doc(db, 'households', targetHouseholdId, 'config', 'geral');
+        const currentConfigSnap = await getDoc(targetConfigRef);
+
+        if (currentConfigSnap.exists()) {
+          const currentConfig = currentConfigSnap.data() as Config;
+          // Merge Logic: Add only if ID doesn't exist
+          const newContas = [...(currentConfig.contas || [])];
+          legacyConfig.contas?.forEach(lc => {
+            if (!newContas.find(cc => cc.id === lc.id)) newContas.push(lc);
+          });
+
+          const newCategorias = [...(currentConfig.categorias || [])];
+          legacyConfig.categorias?.forEach(lcat => {
+            if (!newCategorias.find(cc => cc.id === lcat.id)) newCategorias.push(lcat);
+          });
+
+          await updateDoc(targetConfigRef, {
+            contas: newContas,
+            categorias: newCategorias,
+            legacy_import_config: true
+          });
+        } else {
+          // Determine creation if not exists
+          await setDoc(targetConfigRef, {
+            ...legacyConfig,
+            legacy_import_config: true
+          });
+        }
+      }
+
+      return { success: true, count: successCount };
+
+    } catch (error) {
+      console.error("Migration failed:", error);
+      throw error;
+    }
+  };
+
   return {
     transacoes,
     config,
@@ -193,6 +274,7 @@ export const useFirestore = () => {
     resetHousehold,
     updateMemberRole,
     removeMember,
-    updateHousehold
+    updateHousehold,
+    migrateLegacyData
   };
 };
