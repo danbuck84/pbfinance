@@ -94,8 +94,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                         const newHouseholdRef = doc(collection(db, 'households'));
                         const houseName = user.displayName ? `Família de ${user.displayName.split(' ')[0]}` : 'Minha Família';
 
-                        // Gerar código de Alta Entropia (12 caracteres alfanuméricos)
-                        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                        // Gerar código de Alta Entropia (12 caracteres, Case Sensitive + Especiais)
+                        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*';
                         let inviteCode = '';
                         const randomValues = new Uint32Array(12);
                         crypto.getRandomValues(randomValues);
@@ -154,13 +154,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     const logout = async () => {
         await signOut(auth);
+        setLoading(false); // Garante que o loading seja limpo caso o listener demore
     };
 
     const joinHouseholdByCode = async (code: string) => {
         if (!currentUser) return;
 
         // 1. Buscar o ID da casa pelo código
-        const codeSnap = await getDoc(doc(db, 'invite_codes', code.toUpperCase()));
+        const codeSnap = await getDoc(doc(db, 'invite_codes', code));
         if (!codeSnap.exists()) {
             throw new Error("Código inválido ou não encontrado.");
         }
