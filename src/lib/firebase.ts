@@ -60,6 +60,8 @@ export interface Transacao {
 export interface Conta {
   id: string;
   nome: string;
+  saldo: number;
+  cor?: string;
   disponivelPara: string[];
   tipo?: string;
   agencia?: string;
