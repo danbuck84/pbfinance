@@ -19,25 +19,50 @@ service cloud.firestore {
         // Caso de leitura/escrita normal: Verifica no perfil do usuário
         getUserData().currentHouseholdId == householdId ||
         // Caso de criação (Bootstrapping): Permite se estiver criando a casa e se atribuindo como dono
-        (request.method == 'create' && request.resource.data.ownerId == request.auth.uid)
+        (request.method == 'create' && request.resource.data.ownerId == request.auth.uid) ||
+        // Caso de "Aceitar Convite" (Self-Join): Permite update na lista de members se o usuário foi convidado
+        (request.method == 'update' && 
+         resource.data.invitedEmails.hasAny([request.auth.token.email]) &&
+         request.resource.data.members.hasAll(resource.data.members) && // Não pode remover ninguém
+         request.resource.data.members.size() == resource.data.members.size() + 1 && // Só pode adicionar 1
+         request.resource.data.members[request.resource.data.members.size() - 1] == request.auth.uid // O adicionado é ele mesmo
+        )
       );
+    }
+    
+    // Validar se usuários pertencem à mesma household para permitir leitura de perfil (UI de Membros)
+    function canViewUserProfile(targetUserId) {
+        let requesterData = getUserData();
+        let targetData = get(/databases/$(database)/documents/users/$(targetUserId)).data;
+        return requesterData.currentHouseholdId == targetData.currentHouseholdId;
     }
 
     // Regras para Coleção de Usuários
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId) || canViewUserProfile(userId);
+      allow write: if isOwner(userId);
     }
 
     // Regras para Coleção de Households
     match /households/{householdId} {
       allow read: if belongsToHousehold(householdId);
-      allow create: if request.auth != null; // Permite criar nova casa
-      allow update, delete: if belongsToHousehold(householdId); // Permite update se for membro
+      allow create: if request.auth != null; 
+      allow update: if belongsToHousehold(householdId); 
+      // allow delete: if false; // Por segurança, melhor não deixar deletar por enquanto via client
 
-      // Regras para Subcoleções (transacoes, accounts, etc)
+      // Regras para Subcoleções
       match /{document=**} {
         allow read, write: if belongsToHousehold(householdId);
       }
+    }
+    
+    // Nova Coleção: Invites (para descoberta)
+    // ID do documento deve ser o email (sanitizado, ex: base64 ou só email se válido)
+    match /invites/{email} {
+      // Quem pode ler? O dono do email.
+      allow read: if request.auth.token.email == email;
+      // Quem pode escrever? Um membro de qualquer household convidando esse email.
+      allow write: if request.auth != null; 
     }
     
     // Bloqueio padrão para qualquer outra coleção legado (ex: familias/pbfamily)

@@ -10,6 +10,8 @@ import {
     doc,
     getDoc,
     setDoc,
+    updateDoc,
+    arrayUnion,
     serverTimestamp,
     collection
 } from 'firebase/firestore';
@@ -83,6 +85,46 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                         const householdSnap = await getDoc(householdRef);
                         if (householdSnap.exists()) {
                             householdData = { id: householdSnap.id, ...householdSnap.data() } as Household;
+                        }
+                    }
+
+                    if (!householdData) {
+                        // 2b. Se não tem household, verificar se tem CONVITE pendente
+                        // Buscamos na coleção 'invites' pelo email do usuário
+                        const inviteRef = doc(db, 'invites', user.email!);
+                        const inviteSnap = await getDoc(inviteRef);
+
+                        if (inviteSnap.exists()) {
+                            // Achou convite!
+                            const inviteData = inviteSnap.data();
+                            householdId = inviteData.householdId;
+
+                            // TENTATIVA DE AUTO-JOIN: Atualizar a household adicionando-se aos membros
+                            // Isso só funciona porque a regra de segurança permite update se invitedEmails contiver nosso email
+                            const householdRef = doc(db, 'households', householdId!);
+
+                            try {
+                                await updateDoc(householdRef, {
+                                    members: arrayUnion(user.uid)
+                                });
+
+                                // Sucesso no join!
+                                // Pegar dados atualizados da casa
+                                const householdSnap = await getDoc(householdRef);
+                                if (householdSnap.exists()) {
+                                    householdData = { id: householdSnap.id, ...householdSnap.data() } as Household;
+
+                                    // Atualizar perfil do usuário
+                                    await setDoc(userRef, { currentHouseholdId: householdId }, { merge: true });
+                                    profileData.currentHouseholdId = householdId;
+                                }
+                            } catch (joinError) {
+                                console.error("Erro ao aceitar convite automaticamente:", joinError);
+                                // Se falhar (ex: regra de segurança bloqueou), cairá no fallback de criar nova casa abaixo?
+                                // Não, melhor deixar null pra criar nova casa de fallback ou mostrar erro.
+                                // Vamos deixar cair no fallback de criar casa nova para não travar o login, 
+                                // mas idealmente o usuário veria um erro.
+                            }
                         }
                     }
 

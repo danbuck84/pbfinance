@@ -6,6 +6,7 @@ import { BeneficiosConfig } from '@/components/config/BeneficiosConfig';
 import { CartoesConfig } from '@/components/config/CartoesConfig';
 import { ContasFixasConfig } from '@/components/config/ContasFixasConfig';
 import { CategoriasConfig } from '@/components/config/CategoriasConfig';
+import { FamilyConfig } from '@/components/config/FamilyConfig';
 
 export default function Configuracoes() {
   const { config, updateConfig, transacoes } = useFirestore();
@@ -24,6 +25,7 @@ export default function Configuracoes() {
           <TabsTrigger value="cartoes" className="flex-1 min-w-[100px] text-xs md:text-sm">Cartões</TabsTrigger>
           <TabsTrigger value="fixas" className="flex-1 min-w-[100px] text-xs md:text-sm">C. Fixas</TabsTrigger>
           <TabsTrigger value="categorias" className="flex-1 min-w-[100px] text-xs md:text-sm">Categorias</TabsTrigger>
+          <TabsTrigger value="familia" className="flex-1 min-w-[100px] text-xs md:text-sm">Família</TabsTrigger>
         </TabsList>
 
         <TabsContent value="contas" className="space-y-4">
@@ -53,6 +55,12 @@ export default function Configuracoes() {
         <TabsContent value="categorias" className="space-y-4">
           <Card className="p-4 md:p-6">
             <CategoriasConfig config={config} updateConfig={updateConfig} />
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="familia" className="space-y-4">
+          <Card className="p-4 md:p-6">
+            <FamilyConfig />
           </Card>
         </TabsContent>
       </Tabs>
