@@ -26,6 +26,7 @@ interface AuthContextType {
     signInWithGoogle: () => Promise<void>;
     logout: () => Promise<void>;
     joinHouseholdByCode: (code: string) => Promise<void>;
+    createHousehold: (customName?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -157,6 +158,69 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setLoading(false); // Garante que o loading seja limpo caso o listener demore
     };
 
+    const createHousehold = async (customName?: string) => {
+        if (!currentUser) return;
+
+        const newHouseholdRef = doc(collection(db, 'households'));
+        const houseName = customName || (currentUser.displayName ? `Família de ${currentUser.displayName.split(' ')[0]}` : 'Minha Família');
+
+        // Gerar código de Alta Entropia (12 caracteres, Case Sensitive + Especiais)
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*';
+        let inviteCode = '';
+        const randomValues = new Uint32Array(12);
+        crypto.getRandomValues(randomValues);
+        for (let i = 0; i < 12; i++) {
+            inviteCode += chars[randomValues[i] % chars.length];
+        }
+
+        const newHousehold: Omit<Household, 'id'> = {
+            name: houseName,
+            ownerId: currentUser.uid,
+            members: [currentUser.uid],
+            roles: { [currentUser.uid]: 'OWNER' },
+            inviteCode,
+            createdAt: serverTimestamp(),
+            currency: 'BRL'
+        };
+
+        await setDoc(newHouseholdRef, newHousehold);
+
+        // Criar mapeamento de código para ID da casa
+        await setDoc(doc(db, 'invite_codes', inviteCode), {
+            householdId: newHouseholdRef.id,
+            createdAt: serverTimestamp()
+        });
+
+        // Configurar bootstrap inicial (pode ser feito aqui ou via hook depois, mas aqui garante atomicidade se fizermos batch, ou sequencial)
+        // Como o bootstrap está no hook useFirestore, podemos deixar o usuario "entrar" na casa e o hook rodar se estiver vazia?
+        // O hook useFirestore roda um useEffect na config? Não, o bootstrap é manual.
+        // Vamos criar a config inicial aqui para garantir que a casa nasça pronta.
+        const defaultConfig = {
+            contas: [
+                { id: '1', nome: 'Carteira', tipo: 'carteira', saldo: 0, cor: 'green' },
+                { id: '2', nome: 'Banco Principal', tipo: 'banco', saldo: 0, cor: 'blue' }
+            ],
+            cartoes: [],
+            beneficios: [],
+            contasFixas: [],
+            categorias: [
+                { id: 'cat1', nome: 'Alimentação', cor: 'red', tipo: 'despesa' },
+                { id: 'cat2', nome: 'Moradia', cor: 'blue', tipo: 'despesa' },
+                { id: 'cat3', nome: 'Salário', cor: 'green', tipo: 'receita' }
+            ]
+        };
+        await setDoc(doc(db, 'households', newHouseholdRef.id, 'config', 'geral'), defaultConfig);
+
+
+        // Mudar usuário para a nova casa
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, { currentHouseholdId: newHouseholdRef.id });
+
+        // Atualizar estado
+        setCurrentHousehold({ id: newHouseholdRef.id, ...newHousehold } as Household);
+        setUserProfile(prev => prev ? { ...prev, currentHouseholdId: newHouseholdRef.id } : null);
+    };
+
     const joinHouseholdByCode = async (code: string) => {
         if (!currentUser) return;
 
@@ -195,7 +259,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         loading,
         signInWithGoogle,
         logout,
-        joinHouseholdByCode
+        joinHouseholdByCode,
+        createHousehold
     };
 
     return (
