@@ -62,7 +62,7 @@ export interface Conta {
   nome: string;
   saldo: number;
   cor?: string;
-  disponivelPara: string[];
+  disponivelPara?: string[];
   tipo?: string;
   agencia?: string;
   numeroConta?: string;
