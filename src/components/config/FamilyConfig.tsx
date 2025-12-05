@@ -5,36 +5,49 @@ import { collection, getDocs, query, where, documentId, updateDoc, setDoc, doc }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { UserProfile } from '@/types';
+import { UserProfile, Household } from '@/types'; // Assuming Household type is available
 import { Loader2, Copy, LogIn, Crown, User as UserIcon, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useFirestore } from '@/hooks/useFirestore';
 
 export function FamilyConfig() {
-    const { currentHousehold, currentUser, joinHouseholdByCode, createHousehold } = useAuth();
+    const { currentHousehold, currentUser, joinHouseholdByCode, createHousehold, switchHousehold } = useAuth();
     const [members, setMembers] = useState<UserProfile[]>([]);
+    const [myHouseholds, setMyHouseholds] = useState<Household[]>([]);
     const [joinCode, setJoinCode] = useState('');
     const [loadingMembers, setLoadingMembers] = useState(true);
     const [joining, setJoining] = useState(false);
 
+    // Carregar membros E casas do usuário
     useEffect(() => {
-        async function fetchMembers() {
-            if (!currentHousehold?.members?.length) return;
+        if (!currentUser) return;
 
+        async function fetchData() {
+            setLoadingMembers(true);
             try {
-                const q = query(collection(db, 'users'), where(documentId(), 'in', currentHousehold.members));
-                const snapshot = await getDocs(q);
-                const membersData = snapshot.docs.map(doc => doc.data() as UserProfile);
-                setMembers(membersData);
+                // 1. Membros da casa atual
+                if (currentHousehold?.members?.length) {
+                    const qMembers = query(collection(db, 'users'), where(documentId(), 'in', currentHousehold.members));
+                    const snapshotMembers = await getDocs(qMembers);
+                    setMembers(snapshotMembers.docs.map(doc => doc.data() as UserProfile));
+                } else {
+                    setMembers([]); // Clear members if no current household or no members
+                }
+
+                // 2. Casas do usuário (Switcher)
+                const qHouseholds = query(collection(db, 'households'), where('members', 'array-contains', currentUser!.uid));
+                const snapshotHouseholds = await getDocs(qHouseholds);
+                const houses = snapshotHouseholds.docs.map(doc => ({ id: doc.id, ...doc.data() } as Household));
+                setMyHouseholds(houses);
+
             } catch (error) {
-                console.error("Erro ao buscar membros:", error);
+                console.error("Erro ao carregar dados:", error);
             } finally {
                 setLoadingMembers(false);
             }
         }
-
-        fetchMembers();
-    }, [currentHousehold]);
+        fetchData();
+    }, [currentHousehold, currentUser]);
 
     const handleCopyCode = () => {
         if (currentHousehold?.inviteCode) {
@@ -57,7 +70,6 @@ export function FamilyConfig() {
             await joinHouseholdByCode(joinCode);
             toast.success("Você entrou na nova família!");
             setJoinCode('');
-            // Talvez recarregar a página ou o estado atualiza sozinho
             window.location.reload();
         } catch (error) {
             console.error("Erro ao entrar:", error);
@@ -69,8 +81,6 @@ export function FamilyConfig() {
 
     const handleGenerateCode = async () => {
         if (!currentHousehold) return;
-
-        // Gerar código de Alta Entropia (12 caracteres, Case Sensitive + Especiais)
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*';
         let newCode = '';
         const randomValues = new Uint32Array(12);
@@ -80,21 +90,9 @@ export function FamilyConfig() {
         }
 
         try {
-            // 1. Salvar na Household
-            await updateDoc(doc(db, 'households', currentHousehold.id), {
-                inviteCode: newCode
-            });
-
-            // 2. Criar mapeamento
-            await setDoc(doc(db, 'invite_codes', newCode), {
-                householdId: currentHousehold.id,
-                createdAt: new Date()
-            });
-
+            await updateDoc(doc(db, 'households', currentHousehold.id), { inviteCode: newCode });
+            await setDoc(doc(db, 'invite_codes', newCode), { householdId: currentHousehold.id, createdAt: new Date() });
             toast.success("Código gerado com sucesso!");
-            // Forçar recarregamento simples para atualizar contexto (ou confiar no snapshot listener do AuthContext se houver)
-            // O AuthContext não tem listener na household atual, ele só carrega no inicio?
-            // Vamos verificar. Se não tiver listener, reload é mais garantido pra agora.
             window.location.reload();
         } catch (error) {
             console.error("Erro ao gerar código:", error);
@@ -102,15 +100,11 @@ export function FamilyConfig() {
         }
     };
 
-    // Verificação robusta: É owner se tiver a role OU se for o criador original (legado)
-    const userRole = currentHousehold?.roles?.[currentUser?.uid || ''] || 'MEMBER';
-    const isOwner = userRole === 'OWNER' || currentHousehold?.ownerId === currentUser?.uid;
-
     const handleCreateFamily = async () => {
         const name = window.prompt("Nome da nova família (ex: Família Silva):");
         if (!name) return;
 
-        setJoining(true); // Reutilizando state de loading
+        setJoining(true);
         try {
             await createHousehold(name);
             toast.success("Nova família criada com sucesso!");
@@ -123,17 +117,41 @@ export function FamilyConfig() {
         }
     };
 
+    // Verificação robusta: É owner se tiver a role OU se for o criador original (legado)
+    const userRole = currentHousehold?.roles?.[currentUser?.uid || ''] || 'MEMBER';
+    const isOwner = userRole === 'OWNER' || currentHousehold?.ownerId === currentUser?.uid;
+
     return (
         <div className="space-y-8">
-            {/* SEÇÃO 1: DADOS DA FAMÍLIA ATUAL (CÓDIGO) */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold">Sua Família: {currentHousehold?.name}</h2>
-                    <Button variant="outline" size="sm" onClick={handleCreateFamily}>
-                        <Crown className="mr-2 h-4 w-4" />
-                        Nova Família
-                    </Button>
+            {/* SEÇÃO 0: MEUS LARES (Household Switcher) */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {myHouseholds.map(house => (
+                    <div
+                        key={house.id}
+                        onClick={() => house.id !== currentHousehold?.id && switchHousehold(house.id)}
+                        className={`p-4 border rounded-lg cursor-pointer transition-all hover:bg-secondary/50 flex items-center justify-between ${house.id === currentHousehold?.id ? 'border-primary bg-secondary/20 ring-1 ring-primary' : 'bg-card'}`}
+                    >
+                        <div>
+                            <p className="font-medium">{house.name}</p>
+                            <p className="text-xs text-muted-foreground">{house.members?.length || 0} membros</p>
+                        </div>
+                        {house.id === currentHousehold?.id && <div className="h-2 w-2 rounded-full bg-primary" />}
+                    </div>
+                ))}
+
+                {/* Botão Criar Novo (Card) */}
+                <div
+                    onClick={handleCreateFamily}
+                    className="p-4 border border-dashed rounded-lg cursor-pointer hover:bg-secondary/50 flex items-center justify-center gap-2 text-muted-foreground transition-all"
+                >
+                    <Crown className="w-4 h-4" />
+                    <span>Criar Nova Família</span>
                 </div>
+            </div>
+
+            {/* SEÇÃO 1: DADOS DA FAMÍLIA ATUAL (CÓDIGO) */}
+            <div className="space-y-4 pt-4 border-t">
+                <h2 className="text-lg font-semibold">Configurações de: {currentHousehold?.name}</h2>
 
                 {isOwner ? (
                     <div className="p-4 border rounded-lg bg-secondary/20 space-y-2">
@@ -214,52 +232,44 @@ export function FamilyConfig() {
                 </div>
             </div>
 
-            className="font-mono"
-            maxLength={12}
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value)}
-            required
-                        />
-            <Button type="submit" disabled={joining} variant="secondary">
-                {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4 mr-2" />}
-                Entrar
-                {/* SEÇÃO 3: ENTRAR EM OUTRA FAMÍLIA (Mantida) */}
-                <div className="pt-8 border-t">
-                    <h2 className="text-lg font-semibold mb-2">Entrar em outra Família</h2>
-                    {/* ... form ... */}
-                    <form onSubmit={handleJoin} className="flex gap-2">
-                        {/* ... inputs ... */}
-                        <Input
-                            type="text"
-                            placeholder="Código (ex: aB3$k9...)"
-                            className="font-mono"
-                            maxLength={12}
-                            value={joinCode}
-                            onChange={(e) => setJoinCode(e.target.value)}
-                            required
-                        />
-                        <Button type="submit" disabled={joining} variant="secondary">
-                            {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4 mr-2" />}
-                            Entrar
-                        </Button>
-                    </form>
-                </div>
+            {/* SEÇÃO 3: ENTRAR EM OUTRA FAMÍLIA (Código de Terceiros) */}
+            <div className="pt-8 border-t">
+                <h2 className="text-lg font-semibold mb-2">Entrar em outra Família</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                    Tem um código de convite? Digite abaixo para entrar.
+                </p>
+                <form onSubmit={handleJoin} className="flex gap-2">
+                    <Input
+                        type="text"
+                        placeholder="Código de Convite"
+                        className="font-mono"
+                        maxLength={12}
+                        value={joinCode}
+                        onChange={(e) => setJoinCode(e.target.value)}
+                        required
+                    />
+                    <Button type="submit" disabled={joining} variant="secondary">
+                        {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4 mr-2" />}
+                        Entrar
+                    </Button>
+                </form>
+            </div>
 
-                {/* SEÇÃO 4: ZONA DE PERIGO */}
-                {isOwner && (
-                    <div className="pt-8 border-t mt-8">
-                        <h2 className="text-lg font-semibold text-destructive mb-2">Zona de Perigo</h2>
-                        <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 space-y-4 flex items-center justify-between">
-                            <div>
-                                <h3 className="font-medium text-destructive">Zerar Dados da Família</h3>
-                                <p className="text-sm text-muted-foreground">
-                                    Apaga todas as transações e contas, mantendo os membros. Ação irreversível.
-                                </p>
-                            </div>
-                            <ResetAction />
+            {/* SEÇÃO 4: ZONA DE PERIGO */}
+            {isOwner && (
+                <div className="pt-8 border-t mt-8">
+                    <h2 className="text-lg font-semibold text-destructive mb-2">Zona de Perigo</h2>
+                    <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 space-y-4 flex items-center justify-between">
+                        <div>
+                            <h3 className="font-medium text-destructive">Zerar Dados da Família</h3>
+                            <p className="text-sm text-muted-foreground">
+                                Apaga todas as transações e contas, mantendo os membros. Ação irreversível.
+                            </p>
                         </div>
+                        <ResetAction />
                     </div>
-                )}
+                </div>
+            )}
         </div>
     );
 }

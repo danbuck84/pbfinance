@@ -27,6 +27,7 @@ interface AuthContextType {
     logout: () => Promise<void>;
     joinHouseholdByCode: (code: string) => Promise<void>;
     createHousehold: (customName?: string) => Promise<void>;
+    switchHousehold: (householdId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -154,8 +155,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
 
     const logout = async () => {
-        await signOut(auth);
-        setLoading(false); // Garante que o loading seja limpo caso o listener demore
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+            window.location.reload();
+        }
+    };
+
+    const switchHousehold = async (householdId: string) => {
+        if (!currentUser) return;
+
+        // Atualizar perfil
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, { currentHouseholdId: householdId });
+
+        // Recarregar app para garantir estado limpo e configs novas
+        window.location.reload();
     };
 
     const createHousehold = async (customName?: string) => {
@@ -260,7 +278,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         signInWithGoogle,
         logout,
         joinHouseholdByCode,
-        createHousehold
+        createHousehold,
+        switchHousehold
     };
 
     return (
