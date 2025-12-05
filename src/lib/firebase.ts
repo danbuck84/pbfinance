@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -17,6 +18,7 @@ export const TRANSACOES_PATH = `familias/${FAMILIA_ID}/transacoes`;
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
 
 export const CATEGORIAS_SAIDA = {
   'Ajustes': ['Ajuste de Saída'],
@@ -108,10 +110,10 @@ export interface Config {
 export const getCategorias = (tipo: 'entrada' | 'saida', config?: Config): Record<string, string[]> => {
   const categoriasBase = tipo === 'entrada' ? CATEGORIAS_ENTRADA : CATEGORIAS_SAIDA;
   const categoriasCustom = config?.categoriasCustomizadas?.[tipo] || {};
-  
+
   // Merge das categorias base com as customizadas
   const merged = { ...categoriasBase };
-  
+
   // Aplica customizações (adiciona novas ou remove existentes)
   Object.entries(categoriasCustom).forEach(([key, value]) => {
     if (value === null) {
@@ -122,6 +124,6 @@ export const getCategorias = (tipo: 'entrada' | 'saida', config?: Config): Recor
       merged[key] = value;
     }
   });
-  
+
   return merged;
 };
