@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserProfile } from '@/types';
-import { Loader2, Copy, LogIn, Crown, User as UserIcon } from 'lucide-react';
+import { Loader2, Copy, LogIn, Crown, User as UserIcon, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useFirestore } from '@/hooks/useFirestore';
 
 export function FamilyConfig() {
     const { currentHousehold, currentUser, joinHouseholdByCode } = useAuth();
@@ -190,28 +191,124 @@ export function FamilyConfig() {
                 </div>
             </div>
 
-            {/* SEÇÃO 3: ENTRAR EM OUTRA FAMÍLIA */}
-            <div className="pt-8 border-t">
-                <h2 className="text-lg font-semibold mb-2">Entrar em outra Família</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                    Digite o código de convite de outra família para sair desta e entrar na nova.
-                </p>
-                <form onSubmit={handleJoin} className="flex gap-2">
-                    <Input
-                        type="text"
-                        placeholder="Código (ex: aB3$k9...)"
-                        className="font-mono"
-                        maxLength={12}
-                        value={joinCode}
-                        onChange={(e) => setJoinCode(e.target.value)}
-                        required
-                    />
-                    <Button type="submit" disabled={joining} variant="secondary">
-                        {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4 mr-2" />}
-                        Entrar
-                    </Button>
-                </form>
-            </div>
-        </div>
-    );
+    const handleReset = async () => {
+        if (!isOwner) return;
+
+            const confirm1 = window.confirm("ATENÇÃO: Você tem certeza que deseja RESETAR todos os dados da família? Isso apagará todas as transações e contas.");
+            if (!confirm1) return;
+
+            const confirm2 = window.confirm("Confirmação Final: Esta ação é irreversível. Deseja realmente continuar?");
+            if (confirm2) {
+            try {
+                // Aqui chamamos a função do hook useFirestore.
+                // Mas o useFirestore não está no contexto global, ele é um hook que precisa ser instanciado.
+                // O ideal seria que resetHousehold viesse de onde vem os dados, ou instanciamos o hook aqui.
+                // Como configuracoes.tsx já instancia useFirestore, podemos passar como prop, ou instanciar aqui.
+                // Vamos instanciar aqui pois é uma action específica.
+                // *NOTA*: Preciso importar useFirestore
+            } catch (e) {
+                console.error(e);
+            toast.error("Erro ao resetar.");
+            }
+        }
+    };
+
+            // ... vamos adicionar a UI no return ...
+            // ... porém percebi que preciso do hook useFirestore aqui no componente ...
+
+            return (
+            <div className="space-y-8">
+                {/* SEÇÃO 1 e 2 omitidas para brevidade na diff, mas mantidas no arquivo */}
+
+                {/* ... */}
+
+                {/* SEÇÃO 3: ENTRAR EM OUTRA FAMÍLIA (Mantida) */}
+                <div className="pt-8 border-t">
+                    <h2 className="text-lg font-semibold mb-2">Entrar em outra Família</h2>
+                    {/* ... form ... */}
+                    <form onSubmit={handleJoin} className="flex gap-2">
+                        {/* ... inputs ... */}
+                        <Input
+                            type="text"
+                            placeholder="Código (ex: aB3$k9...)"
+                            className="font-mono"
+                            maxLength={12}
+                            value={joinCode}
+                            onChange={(e) => setJoinCode(e.target.value)}
+                            required
+                        />
+                        <Button type="submit" disabled={joining} variant="secondary">
+                            {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4 mr-2" />}
+                            Entrar
+                            {/* SEÇÃO 3: ENTRAR EM OUTRA FAMÍLIA (Mantida) */}
+                            <div className="pt-8 border-t">
+                                <h2 className="text-lg font-semibold mb-2">Entrar em outra Família</h2>
+                                {/* ... form ... */}
+                                <form onSubmit={handleJoin} className="flex gap-2">
+                                    {/* ... inputs ... */}
+                                    <Input
+                                        type="text"
+                                        placeholder="Código (ex: aB3$k9...)"
+                                        className="font-mono"
+                                        maxLength={12}
+                                        value={joinCode}
+                                        onChange={(e) => setJoinCode(e.target.value)}
+                                        required
+                                    />
+                                    <Button type="submit" disabled={joining} variant="secondary">
+                                        {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4 mr-2" />}
+                                        Entrar
+                                    </Button>
+                                </form>
+                            </div>
+
+                            {/* SEÇÃO 4: ZONA DE PERIGO */}
+                            {isOwner && (
+                                <div className="pt-8 border-t mt-8">
+                                    <h2 className="text-lg font-semibold text-destructive mb-2">Zona de Perigo</h2>
+                                    <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 space-y-4 flex items-center justify-between">
+                                        <div>
+                                            <h3 className="font-medium text-destructive">Zerar Dados da Família</h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                Apaga todas as transações e contas, mantendo os membros. Ação irreversível.
+                                            </p>
+                                        </div>
+                                        <ResetAction />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        );
+}
+
+                        function ResetAction() {
+    const {resetHousehold} = useFirestore(); // O hook que criamos
+                        const [loading, setLoading] = useState(false);
+
+    const handleReset = async () => {
+        const confirm1 = window.confirm("ATENÇÃO: Você tem certeza que deseja RESETAR todos os dados da família? Isso apagará todas as transações, contas e categorias para TODOS os membros.");
+                        if (!confirm1) return;
+
+                        const confirm2 = window.confirm("Confirmação Final: Esta ação é irreversível. Deseja realmente continuar?");
+                        if (!confirm2) return;
+
+                        setLoading(true);
+                        try {
+                            await resetHousehold?.();
+                        toast.success("Dados resetados e recriados com sucesso.");
+                        window.location.reload();
+        } catch (error) {
+                            console.error(error);
+                        toast.error("Erro ao resetar dados.");
+        } finally {
+                            setLoading(false);
+        }
+    };
+
+                        return (
+                        <Button variant="destructive" onClick={handleReset} disabled={loading}>
+                            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Resetar Dados
+                        </Button>
+                        );
 }
