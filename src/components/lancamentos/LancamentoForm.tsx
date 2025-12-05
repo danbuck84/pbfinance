@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { getCategorias, type Config, type Transacao } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrencyInput, parseCurrencyInput } from '@/lib/utils-format';
 
 interface LancamentoFormProps {
@@ -16,6 +17,7 @@ interface LancamentoFormProps {
 
 export const LancamentoForm = ({ config, onAddTransacao, onAddTransacaoParcelada }: LancamentoFormProps) => {
   const { toast } = useToast();
+  const { currentUser } = useAuth();
   const [formData, setFormData] = useState({
     descricao: '',
     valor: '',
@@ -44,8 +46,11 @@ export const LancamentoForm = ({ config, onAddTransacao, onAddTransacaoParcelada
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
+      const autor = currentUser?.displayName || 'Usuário';
+
+
       // Se for movimentação entre contas, criar dois lançamentos
       if (formData.tipo === 'movimentacao_contas') {
         if (!contaOrigem || !contaDestino) {
@@ -70,7 +75,7 @@ export const LancamentoForm = ({ config, onAddTransacao, onAddTransacaoParcelada
           fonte: contaOrigem,
           categoria: 'Transferência',
           subcategoria: 'Entre Contas',
-          pessoa: formData.pessoa,
+          pessoa: autor,
         });
 
         // Lançamento de ENTRADA na conta destino
@@ -82,7 +87,7 @@ export const LancamentoForm = ({ config, onAddTransacao, onAddTransacaoParcelada
           fonte: contaDestino,
           categoria: 'Transferência',
           subcategoria: 'Entre Contas',
-          pessoa: formData.pessoa,
+          pessoa: autor,
         });
 
         toast({ title: 'Movimentação entre contas registrada com sucesso!' });
@@ -104,7 +109,7 @@ export const LancamentoForm = ({ config, onAddTransacao, onAddTransacaoParcelada
           fonte: cartaoPagamento,
           categoria: 'Pagamento de Fatura',
           subcategoria: 'Pagamento',
-          pessoa: formData.pessoa,
+          pessoa: autor,
         });
 
         // Lançamento de SAÍDA na fonte de pagamento
@@ -116,7 +121,7 @@ export const LancamentoForm = ({ config, onAddTransacao, onAddTransacaoParcelada
           fonte: fontePagamento,
           categoria: 'Pagamento de Fatura',
           subcategoria: 'Pagamento',
-          pessoa: formData.pessoa,
+          pessoa: autor,
         });
 
         toast({ title: 'Pagamento de fatura registrado com sucesso!' });
@@ -130,7 +135,7 @@ export const LancamentoForm = ({ config, onAddTransacao, onAddTransacaoParcelada
           fonte: formData.fonte,
           categoria: formData.categoria,
           subcategoria: formData.subcategoria,
-          pessoa: formData.pessoa,
+          pessoa: autor,
         };
 
         if (isParcelado && numParcelas) {
@@ -251,20 +256,7 @@ export const LancamentoForm = ({ config, onAddTransacao, onAddTransacaoParcelada
             </Select>
           </div>
 
-          <div>
-            <Label htmlFor="pessoa">Quem Lançou?</Label>
-            <Select value={formData.pessoa} onValueChange={(value) => setFormData({ ...formData, pessoa: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Ambos">Ambos</SelectItem>
-                <SelectItem value="Carol">Carol</SelectItem>
-                <SelectItem value="Dan">Dan</SelectItem>
-                <SelectItem value="Outros">Outros</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
         </>
       )}
 
@@ -298,20 +290,7 @@ export const LancamentoForm = ({ config, onAddTransacao, onAddTransacaoParcelada
             </Select>
           </div>
 
-          <div>
-            <Label htmlFor="pessoa">Quem Lançou?</Label>
-            <Select value={formData.pessoa} onValueChange={(value) => setFormData({ ...formData, pessoa: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Ambos">Ambos</SelectItem>
-                <SelectItem value="Carol">Carol</SelectItem>
-                <SelectItem value="Dan">Dan</SelectItem>
-                <SelectItem value="Outros">Outros</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
         </>
       )}
 
@@ -360,20 +339,7 @@ export const LancamentoForm = ({ config, onAddTransacao, onAddTransacaoParcelada
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="pessoa">Quem Lançou?</Label>
-            <Select value={formData.pessoa} onValueChange={(value) => setFormData({ ...formData, pessoa: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Ambos">Ambos</SelectItem>
-                <SelectItem value="Carol">Carol</SelectItem>
-                <SelectItem value="Dan">Dan</SelectItem>
-                <SelectItem value="Outros">Outros</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
 
           {formData.tipo === 'saida' && config.cartoes?.some(c => c.nome === formData.fonte) && (
             <div className="space-y-4">

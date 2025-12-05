@@ -30,7 +30,7 @@ import { useFirestore } from '@/hooks/useFirestore';
 
 export function FamilyConfig() {
     const { currentHousehold, currentUser, joinHouseholdByCode, createHousehold, switchHousehold } = useAuth();
-    const { updateMemberRole, removeMember } = useFirestore(); // Hook completo
+    const { updateMemberRole, removeMember, updateHousehold } = useFirestore(); // Hook completo
     const [members, setMembers] = useState<UserProfile[]>([]);
     const [myHouseholds, setMyHouseholds] = useState<Household[]>([]);
     const [joinCode, setJoinCode] = useState('');
@@ -136,7 +136,19 @@ export function FamilyConfig() {
         }
     };
 
-    // Verificação robusta: É owner se tiver a role OU se for o criador original (legado)
+    const handleRename = async () => {
+        const newName = window.prompt("Novo nome da família:", currentHousehold?.name || "");
+        if (!newName || newName === currentHousehold?.name) return;
+
+        try {
+            await updateHousehold({ name: newName });
+            toast.success("Família renomeada com sucesso!");
+            window.location.reload();
+        } catch (error) {
+            console.error(error);
+            toast.error("Erro ao renomear família.");
+        }
+    };
     const userRole = currentHousehold?.roles?.[currentUser?.uid || ''] || 'MEMBER';
     const isOwner = userRole === 'OWNER' || currentHousehold?.ownerId === currentUser?.uid;
 
@@ -343,12 +355,12 @@ export function FamilyConfig() {
                 <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 space-y-4">
 
                     {/* Edição de Nome (Novo) */}
-                    <div className="flex items-center gap-2">
-                        <Input
-                            placeholder="Editar Nome da Família"
-                            defaultValue={currentHousehold?.name}
-                        />
-                        <Button variant="outline" size="sm">Renomear</Button>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="font-medium">Nome da Família</h3>
+                            <p className="text-sm text-muted-foreground">Atual: {currentHousehold?.name}</p>
+                        </div>
+                        <Button variant="outline" onClick={handleRename}>Renomear</Button>
                     </div>
 
                     <div className="flex items-center justify-between">

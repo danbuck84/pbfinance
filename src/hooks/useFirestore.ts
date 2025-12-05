@@ -176,6 +176,11 @@ export const useFirestore = () => {
     await bootstrapHousehold();
   };
 
+  const updateHousehold = async (data: Partial<any>) => { // Use 'any' or 'Household' type if imported
+    if (!currentHousehold) return;
+    await updateDoc(doc(db, 'households', currentHousehold.id), data);
+  };
+
   return {
     transacoes,
     config,
@@ -187,6 +192,7 @@ export const useFirestore = () => {
     addTransacaoParcelada,
     resetHousehold,
     updateMemberRole,
-    removeMember
+    removeMember,
+    updateHousehold
   };
 };
