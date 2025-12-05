@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Função auxiliar para obter dados do usuário logado
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Função auxiliar para verificar se é o próprio usuário
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Função auxiliar para verificar pertencimento à Household
+    function belongsToHousehold(householdId) {
+      return request.auth != null && (
+        // Caso de leitura/escrita normal: Verifica no perfil do usuário
+        getUserData().currentHouseholdId == householdId ||
+        // Caso de criação (Bootstrapping): Permite se estiver criando a casa e se atribuindo como dono
+        (request.method == 'create' && request.resource.data.ownerId == request.auth.uid)
+      );
+    }
+
+    // Regras para Coleção de Usuários
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Regras para Coleção de Households
+    match /households/{householdId} {
+      allow read: if belongsToHousehold(householdId);
+      allow create: if request.auth != null; // Permite criar nova casa
+      allow update, delete: if belongsToHousehold(householdId); // Permite update se for membro
+
+      // Regras para Subcoleções (transacoes, accounts, etc)
+      match /{document=**} {
+        allow read, write: if belongsToHousehold(householdId);
+      }
+    }
+    
+    // Bloqueio padrão para qualquer outra coleção legado (ex: familias/pbfamily)
+    match /{document=**} {
+      allow read, write: if false; 
+    }
+  }
+}
