@@ -58,6 +58,7 @@ export interface Transacao {
 }
 
 export interface Conta {
+  id: string;
   nome: string;
   disponivelPara: string[];
   tipo?: string;
