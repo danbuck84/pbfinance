@@ -164,20 +164,7 @@ export const LancamentoEditDialog = ({
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="edit-pessoa">Pessoa</Label>
-            <Select value={formData.pessoa} onValueChange={(value) => setFormData({ ...formData, pessoa: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Ambos">Ambos</SelectItem>
-                <SelectItem value="Carol">Carol</SelectItem>
-                <SelectItem value="Dan">Dan</SelectItem>
-                <SelectItem value="Outros">Outros</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button type="button" variant="destructive" onClick={handleDelete} className="w-full sm:w-auto">
