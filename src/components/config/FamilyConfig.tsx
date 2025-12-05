@@ -1,21 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayUnion, setDoc, collection, getDocs, query, where, documentId } from 'firebase/firestore';
-import { Card } from '@/components/ui/card';
+import { collection, getDocs, query, where, documentId } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserProfile } from '@/types';
-import { Loader2, Plus, Mail } from 'lucide-react';
+import { Loader2, Copy, LogIn, Crown, User as UserIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function FamilyConfig() {
-    const { currentHousehold, currentUser } = useAuth();
+    const { currentHousehold, currentUser, joinHouseholdByCode } = useAuth();
     const [members, setMembers] = useState<UserProfile[]>([]);
-    const [inviteEmail, setInviteEmail] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [joinCode, setJoinCode] = useState('');
     const [loadingMembers, setLoadingMembers] = useState(true);
+    const [joining, setJoining] = useState(false);
 
     useEffect(() => {
         async function fetchMembers() {
@@ -36,93 +35,131 @@ export function FamilyConfig() {
         fetchMembers();
     }, [currentHousehold]);
 
-    const handleInvite = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!inviteEmail || !currentHousehold) return;
-
-        setLoading(true);
-        try {
-            const email = inviteEmail.toLowerCase().trim();
-
-            // 1. Atualizar a Household com o email permitido
-            const householdRef = doc(db, 'households', currentHousehold.id);
-            await updateDoc(householdRef, {
-                invitedEmails: arrayUnion(email)
-            });
-
-            // 2. Criar registro na coleção 'invites' para descoberta
-            // Usamos o email como ID do documento para facilitar a busca por regra de segurança
-            await setDoc(doc(db, 'invites', email), {
-                householdId: currentHousehold.id,
-                householdName: currentHousehold.name,
-                invitedBy: currentUser?.uid,
-                invitedAt: new Date()
-            });
-
-            toast.success(`Convite enviado para ${email}`);
-            setInviteEmail('');
-        } catch (error) {
-            console.error("Erro ao convidar:", error);
-            toast.error("Erro ao enviar convite");
-        } finally {
-            setLoading(false);
+    const handleCopyCode = () => {
+        if (currentHousehold?.inviteCode) {
+            navigator.clipboard.writeText(currentHousehold.inviteCode);
+            toast.success("Código copiado!");
+        } else {
+            toast.error("Código não disponível.");
         }
     };
 
+    const handleJoin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!joinCode || joinCode.length < 6) {
+            toast.error("Código inválido.");
+            return;
+        }
+
+        setJoining(true);
+        try {
+            await joinHouseholdByCode(joinCode);
+            toast.success("Você entrou na nova família!");
+            setJoinCode('');
+            // Talvez recarregar a página ou o estado atualiza sozinho
+            window.location.reload();
+        } catch (error) {
+            console.error("Erro ao entrar:", error);
+            toast.error("Falha ao entrar: Código inválido ou erro de sistema.");
+        } finally {
+            setJoining(false);
+        }
+    };
+
+    const userRole = currentHousehold?.roles?.[currentUser?.uid || ''] || 'MEMBER';
+    const isOwner = userRole === 'OWNER';
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
+            {/* SEÇÃO 1: DADOS DA FAMÍLIA ATUAL (CÓDIGO) */}
+            <div className="space-y-4">
+                <h2 className="text-lg font-semibold">Sua Família: {currentHousehold?.name}</h2>
+
+                {isOwner ? (
+                    <div className="p-4 border rounded-lg bg-secondary/20 space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground">Código de Convite</label>
+                        <div className="flex gap-2 items-center">
+                            <code className="flex-1 bg-background p-3 rounded border text-center text-2xl font-mono tracking-widest truncate">
+                                {currentHousehold?.inviteCode || '...'}
+                            </code>
+                            <Button size="icon" variant="outline" onClick={handleCopyCode} title="Copiar Código">
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground text-center">
+                            Compartilhe este código com quem você quer adicionar.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="p-4 border rounded-lg bg-muted text-center text-sm text-muted-foreground">
+                        Você é um membro desta família. Apenas o administrador pode ver o código de convite.
+                    </div>
+                )}
+            </div>
+
+            {/* SEÇÃO 2: MEMBROS */}
             <div>
                 <h2 className="text-lg font-semibold mb-4">Membros da Família</h2>
-                <div className="space-y-4">
+                <div className="space-y-3">
                     {loadingMembers ? (
                         <div className="flex items-center gap-2 text-muted-foreground">
                             <Loader2 className="h-4 w-4 animate-spin" />
                             Carregando membros...
                         </div>
                     ) : (
-                        members.map(member => (
-                            <div key={member.uid} className="flex items-center justify-between p-3 border rounded-lg bg-card">
-                                <div className="flex items-center gap-3">
-                                    <Avatar>
-                                        <AvatarImage src={member.photoURL || ''} />
-                                        <AvatarFallback>{member.displayName?.substring(0, 2).toUpperCase()}</AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                        <p className="font-medium">{member.displayName}</p>
-                                        <p className="text-xs text-muted-foreground">{member.email}</p>
+                        members.map(member => {
+                            const role = currentHousehold?.roles?.[member.uid] || 'MEMBER';
+                            return (
+                                <div key={member.uid} className="flex items-center justify-between p-3 border rounded-lg bg-card">
+                                    <div className="flex items-center gap-3">
+                                        <Avatar>
+                                            <AvatarImage src={member.photoURL || ''} />
+                                            <AvatarFallback>{member.displayName?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <p className="font-medium">{member.displayName}</p>
+                                            <p className="text-xs text-muted-foreground">{member.email}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {role === 'OWNER' ? (
+                                            <span className="text-xs bg-amber-500/10 text-amber-600 px-2 py-1 rounded-full flex items-center gap-1 font-medium border border-amber-500/20">
+                                                <Crown className="w-3 h-3" /> Admin
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full flex items-center gap-1 dark:bg-slate-800 dark:text-slate-400">
+                                                <UserIcon className="w-3 h-3" /> Membro
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
-                                {member.uid === currentHousehold?.ownerId && (
-                                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">Dono</span>
-                                )}
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             </div>
 
-            <div className="pt-6 border-t">
-                <h2 className="text-lg font-semibold mb-4">Convidar Novo Membro</h2>
-                <form onSubmit={handleInvite} className="flex gap-2">
-                    <div className="relative flex-1">
-                        <Mail className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            type="email"
-                            placeholder="Digite o e-mail da pessoa..."
-                            className="pl-9"
-                            value={inviteEmail}
-                            onChange={(e) => setInviteEmail(e.target.value)}
-                            required
-                        />
-                    </div>
-                    <Button type="submit" disabled={loading}>
-                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-                        {loading ? 'Enviando...' : 'Convidar'}
+            {/* SEÇÃO 3: ENTRAR EM OUTRA FAMÍLIA */}
+            <div className="pt-8 border-t">
+                <h2 className="text-lg font-semibold mb-2">Entrar em outra Família</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                    Digite o código de convite de outra família para sair desta e entrar na nova.
+                </p>
+                <form onSubmit={handleJoin} className="flex gap-2">
+                    <Input
+                        type="text"
+                        placeholder="Código (ex: A1B2C3)"
+                        className="font-mono uppercase"
+                        maxLength={8}
+                        value={joinCode}
+                        onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                        required
+                    />
+                    <Button type="submit" disabled={joining} variant="secondary">
+                        {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4 mr-2" />}
+                        Entrar
                     </Button>
                 </form>
-                <p className="text-xs text-muted-foreground mt-2">
-                    A pessoa precisará fazer login com este e-mail Google para entrar na família.
-                </p>
             </div>
         </div>
     );

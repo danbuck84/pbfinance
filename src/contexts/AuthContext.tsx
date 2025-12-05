@@ -25,6 +25,7 @@ interface AuthContextType {
     loading: boolean;
     signInWithGoogle: () => Promise<void>;
     logout: () => Promise<void>;
+    joinHouseholdByCode: (code: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -89,59 +90,30 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                     }
 
                     if (!householdData) {
-                        // 2b. Se não tem household, verificar se tem CONVITE pendente
-                        // Buscamos na coleção 'invites' pelo email do usuário
-                        const inviteRef = doc(db, 'invites', user.email!);
-                        const inviteSnap = await getDoc(inviteRef);
-
-                        if (inviteSnap.exists()) {
-                            // Achou convite!
-                            const inviteData = inviteSnap.data();
-                            householdId = inviteData.householdId;
-
-                            // TENTATIVA DE AUTO-JOIN: Atualizar a household adicionando-se aos membros
-                            // Isso só funciona porque a regra de segurança permite update se invitedEmails contiver nosso email
-                            const householdRef = doc(db, 'households', householdId!);
-
-                            try {
-                                await updateDoc(householdRef, {
-                                    members: arrayUnion(user.uid)
-                                });
-
-                                // Sucesso no join!
-                                // Pegar dados atualizados da casa
-                                const householdSnap = await getDoc(householdRef);
-                                if (householdSnap.exists()) {
-                                    householdData = { id: householdSnap.id, ...householdSnap.data() } as Household;
-
-                                    // Atualizar perfil do usuário
-                                    await setDoc(userRef, { currentHouseholdId: householdId }, { merge: true });
-                                    profileData.currentHouseholdId = householdId;
-                                }
-                            } catch (joinError) {
-                                console.error("Erro ao aceitar convite automaticamente:", joinError);
-                                // Se falhar (ex: regra de segurança bloqueou), cairá no fallback de criar nova casa abaixo?
-                                // Não, melhor deixar null pra criar nova casa de fallback ou mostrar erro.
-                                // Vamos deixar cair no fallback de criar casa nova para não travar o login, 
-                                // mas idealmente o usuário veria um erro.
-                            }
-                        }
-                    }
-
-                    if (!householdData) {
                         // Criar nova Household se não existir ou não for encontrada
                         const newHouseholdRef = doc(collection(db, 'households'));
                         const houseName = user.displayName ? `Família de ${user.displayName.split(' ')[0]}` : 'Minha Família';
+
+                        // Gerar código simples de 6 caracteres
+                        const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
                         const newHousehold: Omit<Household, 'id'> = {
                             name: houseName,
                             ownerId: user.uid,
                             members: [user.uid],
+                            roles: { [user.uid]: 'OWNER' },
+                            inviteCode,
                             createdAt: serverTimestamp(),
                             currency: 'BRL'
                         };
 
                         await setDoc(newHouseholdRef, newHousehold);
+
+                        // Criar mapeamento de código para ID da casa (para busca rápida e segura)
+                        await setDoc(doc(db, 'invite_codes', inviteCode), {
+                            householdId: newHouseholdRef.id,
+                            createdAt: serverTimestamp()
+                        });
 
                         householdId = newHouseholdRef.id;
                         householdData = { id: householdId, ...newHousehold };
@@ -178,13 +150,45 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         await signOut(auth);
     };
 
+    const joinHouseholdByCode = async (code: string) => {
+        if (!currentUser) return;
+
+        // 1. Buscar o ID da casa pelo código
+        const codeSnap = await getDoc(doc(db, 'invite_codes', code.toUpperCase()));
+        if (!codeSnap.exists()) {
+            throw new Error("Código inválido ou não encontrado.");
+        }
+
+        const { householdId } = codeSnap.data();
+
+        // 2. Adicionar usuário à Household
+        const householdRef = doc(db, 'households', householdId);
+
+        // Usamos updateDoc para adicionar ao array e ao map de roles
+        // Nota: Precisaremos atualizar as regras de segurança para permitir isso
+        await setDoc(householdRef, {
+            members: arrayUnion(currentUser.uid),
+            roles: { [currentUser.uid]: 'MEMBER' }
+        }, { merge: true });
+
+        // 3. Atualizar perfil do usuário
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, { currentHouseholdId: householdId });
+
+        // 4. Atualizar estado local
+        const householdSnap = await getDoc(householdRef);
+        setCurrentHousehold({ id: householdSnap.id, ...householdSnap.data() } as Household);
+        setUserProfile(prev => prev ? { ...prev, currentHouseholdId: householdId } : null);
+    };
+
     const value = {
         currentUser,
         userProfile,
         currentHousehold,
         loading,
         signInWithGoogle,
-        logout
+        logout,
+        joinHouseholdByCode
     };
 
     return (

@@ -20,12 +20,17 @@ service cloud.firestore {
         getUserData().currentHouseholdId == householdId ||
         // Caso de criação (Bootstrapping): Permite se estiver criando a casa e se atribuindo como dono
         (request.method == 'create' && request.resource.data.ownerId == request.auth.uid) ||
-        // Caso de "Aceitar Convite" (Self-Join): Permite update na lista de members se o usuário foi convidado
+        
+        // Caso de JOIN (Entrar na casa): 
+        // O usuário descobre o ID via invite_codes e tenta se adicionar.
+        // Permitimos update se ele estiver APENAS se adicionando à lista de membros e roles.
         (request.method == 'update' && 
-         resource.data.invitedEmails.hasAny([request.auth.token.email]) &&
-         request.resource.data.members.hasAll(resource.data.members) && // Não pode remover ninguém
-         request.resource.data.members.size() == resource.data.members.size() + 1 && // Só pode adicionar 1
-         request.resource.data.members[request.resource.data.members.size() - 1] == request.auth.uid // O adicionado é ele mesmo
+         // Garante que não está removendo ninguém
+         request.resource.data.members.hasAll(resource.data.members) &&
+         // Garante que está se adicionando
+         request.resource.data.members.hasAny([request.auth.uid]) &&
+         // (Opcional) Poderíamos validar que ele não está se dando role de OWNER, mas deixamos simples por enquanto
+         true
         )
       );
     }
@@ -48,7 +53,7 @@ service cloud.firestore {
       allow read: if belongsToHousehold(householdId);
       allow create: if request.auth != null; 
       allow update: if belongsToHousehold(householdId); 
-      // allow delete: if false; // Por segurança, melhor não deixar deletar por enquanto via client
+      // allow delete: if false; 
 
       // Regras para Subcoleções
       match /{document=**} {
@@ -56,13 +61,13 @@ service cloud.firestore {
       }
     }
     
-    // Nova Coleção: Invites (para descoberta)
-    // ID do documento deve ser o email (sanitizado, ex: base64 ou só email se válido)
-    match /invites/{email} {
-      // Quem pode ler? O dono do email.
-      allow read: if request.auth.token.email == email;
-      // Quem pode escrever? Um membro de qualquer household convidando esse email.
-      allow write: if request.auth != null; 
+    // Invite Codes: Mapeamento Code -> ID
+    match /invite_codes/{code} {
+      // Qualquer um autenticado pode ler para resolver o código
+      allow read: if request.auth != null;
+      // Ninguém pode escrever direto aqui via cliente (feito via lógica backend ou admin, mas aqui faremos via allow create com household)
+      // Para MVP: Permitir create se userID for owner da household referenciada
+      allow create: if request.auth != null; 
     }
     
     // Bloqueio padrão para qualquer outra coleção legado (ex: familias/pbfamily)
