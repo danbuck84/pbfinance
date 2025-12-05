@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, documentId } from 'firebase/firestore';
+import { collection, getDocs, query, where, documentId, updateDoc, setDoc, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -66,8 +66,38 @@ export function FamilyConfig() {
         }
     };
 
+    const handleGenerateCode = async () => {
+        if (!currentHousehold) return;
+
+        // Gerar código simples de 6 caracteres
+        const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+        try {
+            // 1. Salvar na Household
+            await updateDoc(doc(db, 'households', currentHousehold.id), {
+                inviteCode: newCode
+            });
+
+            // 2. Criar mapeamento
+            await setDoc(doc(db, 'invite_codes', newCode), {
+                householdId: currentHousehold.id,
+                createdAt: new Date()
+            });
+
+            toast.success("Código gerado com sucesso!");
+            // Forçar recarregamento simples para atualizar contexto (ou confiar no snapshot listener do AuthContext se houver)
+            // O AuthContext não tem listener na household atual, ele só carrega no inicio?
+            // Vamos verificar. Se não tiver listener, reload é mais garantido pra agora.
+            window.location.reload();
+        } catch (error) {
+            console.error("Erro ao gerar código:", error);
+            toast.error("Erro ao gerar código.");
+        }
+    };
+
+    // Verificação robusta: É owner se tiver a role OU se for o criador original (legado)
     const userRole = currentHousehold?.roles?.[currentUser?.uid || ''] || 'MEMBER';
-    const isOwner = userRole === 'OWNER';
+    const isOwner = userRole === 'OWNER' || currentHousehold?.ownerId === currentUser?.uid;
 
     return (
         <div className="space-y-8">
@@ -78,17 +108,32 @@ export function FamilyConfig() {
                 {isOwner ? (
                     <div className="p-4 border rounded-lg bg-secondary/20 space-y-2">
                         <label className="text-sm font-medium text-muted-foreground">Código de Convite</label>
-                        <div className="flex gap-2 items-center">
-                            <code className="flex-1 bg-background p-3 rounded border text-center text-2xl font-mono tracking-widest truncate">
-                                {currentHousehold?.inviteCode || '...'}
-                            </code>
-                            <Button size="icon" variant="outline" onClick={handleCopyCode} title="Copiar Código">
-                                <Copy className="h-4 w-4" />
-                            </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground text-center">
-                            Compartilhe este código com quem você quer adicionar.
-                        </p>
+
+                        {currentHousehold?.inviteCode ? (
+                            <>
+                                <div className="flex gap-2 items-center">
+                                    <code className="flex-1 bg-background p-3 rounded border text-center text-2xl font-mono tracking-widest truncate">
+                                        {currentHousehold.inviteCode}
+                                    </code>
+                                    <Button size="icon" variant="outline" onClick={handleCopyCode} title="Copiar Código">
+                                        <Copy className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <p className="text-xs text-muted-foreground text-center">
+                                    Compartilhe este código com quem você quer adicionar.
+                                </p>
+                            </>
+                        ) : (
+                            <div className="flex flex-col gap-2">
+                                <p className="text-sm text-amber-600 dark:text-amber-400">
+                                    Esta família ainda não possui um código de convite (Legado).
+                                </p>
+                                <Button onClick={handleGenerateCode} variant="outline" className="w-full">
+                                    <Crown className="mr-2 h-4 w-4" />
+                                    Gerar Código de Convite
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="p-4 border rounded-lg bg-muted text-center text-sm text-muted-foreground">
