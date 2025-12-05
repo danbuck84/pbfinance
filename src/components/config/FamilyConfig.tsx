@@ -69,8 +69,14 @@ export function FamilyConfig() {
     const handleGenerateCode = async () => {
         if (!currentHousehold) return;
 
-        // Gerar código simples de 6 caracteres
-        const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        // Gerar código de Alta Entropia (12 caracteres alfanuméricos)
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let newCode = '';
+        const randomValues = new Uint32Array(12);
+        crypto.getRandomValues(randomValues);
+        for (let i = 0; i < 12; i++) {
+            newCode += chars[randomValues[i] % chars.length];
+        }
 
         try {
             // 1. Salvar na Household
@@ -193,9 +199,9 @@ export function FamilyConfig() {
                 <form onSubmit={handleJoin} className="flex gap-2">
                     <Input
                         type="text"
-                        placeholder="Código (ex: A1B2C3)"
+                        placeholder="Código (ex: A1B2C3...)"
                         className="font-mono uppercase"
-                        maxLength={8}
+                        maxLength={12}
                         value={joinCode}
                         onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                         required

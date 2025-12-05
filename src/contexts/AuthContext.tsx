@@ -94,8 +94,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                         const newHouseholdRef = doc(collection(db, 'households'));
                         const houseName = user.displayName ? `Família de ${user.displayName.split(' ')[0]}` : 'Minha Família';
 
-                        // Gerar código simples de 6 caracteres
-                        const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                        // Gerar código de Alta Entropia (12 caracteres alfanuméricos)
+                        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                        let inviteCode = '';
+                        const randomValues = new Uint32Array(12);
+                        crypto.getRandomValues(randomValues);
+                        for (let i = 0; i < 12; i++) {
+                            inviteCode += chars[randomValues[i] % chars.length];
+                        }
 
                         const newHousehold: Omit<Household, 'id'> = {
                             name: houseName,
